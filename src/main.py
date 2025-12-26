@@ -292,8 +292,28 @@ class App:
         if self.selected_part:
              self.renderer.render_selected_outline(self.selected_part, view, proj)
         
+        # Render Light Gizmo
+        self.renderer.render_light_source(view, proj)
+
         # Render UI
         imgui.new_frame()
+        
+        # Draw Light Label
+        viewport = gl.glGetIntegerv(gl.GL_VIEWPORT) # [x, y, w, h]
+        # Project light pos to screen
+        screen_pos = glm.project(self.renderer.light_pos, view, proj, glm.vec4(viewport))
+        # screen_pos.y is from bottom, imgui uses from top
+        window_h = glfw.get_window_size(self.window)[1]
+        
+        # Check if light is in front of camera
+        # Simple check: distance to plane? Or just check z in clip space?
+        # glm.project returns window coordinates. Z is depth (0-1).
+        if 0.0 <= screen_pos.z <= 1.0:
+            imgui.set_next_window_position(screen_pos.x, window_h - screen_pos.y)
+            imgui.begin("LightLabel", flags=imgui.WINDOW_NO_TITLE_BAR | imgui.WINDOW_NO_RESIZE | imgui.WINDOW_ALWAYS_AUTO_RESIZE | imgui.WINDOW_NO_BACKGROUND | imgui.WINDOW_NO_INPUTS)
+            imgui.text_colored("Light Source", 1.0, 1.0, 0.0, 1.0) # Yellow text
+            imgui.end()
+
         self.draw_ui()
         
         # Overlay Status Message
@@ -345,7 +365,14 @@ class App:
         imgui.begin("Properties")
         imgui.text("Application Average: %.3f ms/frame (%.1f FPS)" % (1000.0/imgui.get_io().framerate, imgui.get_io().framerate))
         
+        if imgui.collapsing_header("Lighting", None, imgui.TREE_NODE_DEFAULT_OPEN)[0]:
+            l_pos = self.renderer.light_pos
+            changed, new_l_pos = imgui.drag_float3("Light Position", l_pos.x, l_pos.y, l_pos.z, change_speed=10.0)
+            if changed:
+                self.renderer.light_pos = glm.vec3(new_l_pos[0], new_l_pos[1], new_l_pos[2])
+        
         if self.selected_part:
+            imgui.separator()
             imgui.text(f"Selected: {self.selected_part.name}")
             if imgui.button("Delete"):
                 self.scene.remove_object(self.selected_part)
@@ -374,6 +401,47 @@ class App:
                 if imgui.button("Rotate Z +90"):
                     rot = glm.rotate(glm.mat4(1.0), glm.radians(90), glm.vec3(0, 0, 1))
                     self.selected_part.matrix = self.selected_part.matrix * rot
+
+                imgui.separator()
+                imgui.text("Material")
+                
+                # Ensure material dict exists
+                if not hasattr(self.selected_part, 'material') or self.selected_part.material is None:
+                    self.selected_part.material = {
+                        'shininess': self.renderer.default_shininess,
+                        'specular': self.renderer.default_specular,
+                        'reflectivity': self.renderer.default_reflectivity,
+                        'metallic': self.renderer.default_metallic,
+                        'rim': self.renderer.default_rim
+                    }
+                
+                mat = self.selected_part.material
+                
+                # Use Roughness slider instead of Shininess for better UX
+                # Roughness 0 -> Shininess 256, Roughness 1 -> Shininess 2
+                current_roughness = 1.0 - math.sqrt((mat['shininess'] - 2.0) / 254.0)
+                current_roughness = max(0.0, min(1.0, current_roughness))
+                
+                changed_ro, ro = imgui.slider_float("Roughness", current_roughness, 0.0, 1.0)
+                if changed_ro:
+                    # Convert Roughness back to Shininess
+                    # S = 254 * (1 - R)^2 + 2
+                    mat['shininess'] = 254.0 * ((1.0 - ro) ** 2) + 2.0
+                
+                changed_sp, sp = imgui.slider_float("Specular Strength", mat['specular'], 0.0, 5.0)
+                if changed_sp: mat['specular'] = sp
+                
+                changed_m, m = imgui.slider_float("Metallic", mat['metallic'], 0.0, 1.0)
+                if changed_m: mat['metallic'] = m
+                
+                changed_r, r = imgui.slider_float("Reflectivity (Mirror)", mat['reflectivity'], 0.0, 1.0)
+                if changed_r: mat['reflectivity'] = r
+                
+                changed_rim, rim = imgui.slider_float("Rim Light (Backlight)", mat['rim'], 0.0, 5.0)
+                if changed_rim: mat['rim'] = rim
+                
+                if imgui.button("Reset Material"):
+                    self.selected_part.material = None # Reset to defaults
 
         imgui.end()
 

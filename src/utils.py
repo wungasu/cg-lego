@@ -12,9 +12,8 @@ def export_stl(scene, filename):
             norm_mat = glm.transpose(glm.inverse(glm.mat3(world_mat)))
             
             part = obj.part
-            # Iterate triangles
-            # vertices list is flat [x,y,z, x,y,z, ...]
-            count = len(part.vertices) // 9 # 3 vertices * 3 coords
+
+            count = len(part.vertices) 
             
             for i in range(count):
                 idx = i * 9

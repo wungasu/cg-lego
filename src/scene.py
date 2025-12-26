@@ -10,10 +10,10 @@ class SceneObject:
         self.selected = False
         
     def set_parent(self, new_parent):
-        # Calculate current world matrix
+
         current_world = self.world_matrix
         
-        # Detach from old parent
+
         if self.parent:
             self.parent.children.remove(self)
         
