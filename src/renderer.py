@@ -8,34 +8,29 @@ import ctypes
 class Renderer:
     def __init__(self):
         self.prog = self._create_program()
-        self.vaos = {} # part_id -> (vao, count)
+        self.vaos = {} 
         self._init_grid()
         self._init_light_viz()
         self._init_marker()
-        
-        # Shadow Mapping
+
         self.shadow_width = 2048
         self.shadow_height = 2048
         self._init_shadow_map()
         self.shadow_prog = self._create_shadow_program()
-        
-        # Light
+
         self.light_pos = glm.vec3(300.0, 500.0, 500.0)
         self.light_color = glm.vec3(1.0, 1.0, 1.0)
         self.ambient_strength = 0.3
-        
-        # Material defaults
+
         self.default_shininess = 64.0
         self.default_specular = 0.5
         self.default_reflectivity = 0.0
         self.default_metallic = 0.0
-        self.default_rim = 0.2 # Slight rim by default for plastic look
-        
-        # Environment Map
+        self.default_rim = 0.2 
+
         self.env_map_size = 512
         self._init_env_map()
-        
-        # Outline
+
         self._init_outline_shader()
 
     def _init_env_map(self):
@@ -52,8 +47,7 @@ class Renderer:
         gl.glTexParameteri(gl.GL_TEXTURE_CUBE_MAP, gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP_TO_EDGE)
         gl.glTexParameteri(gl.GL_TEXTURE_CUBE_MAP, gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP_TO_EDGE)
         gl.glTexParameteri(gl.GL_TEXTURE_CUBE_MAP, gl.GL_TEXTURE_WRAP_R, gl.GL_CLAMP_TO_EDGE)
-        
-        # We also need a depth buffer for the FBO
+
         self.env_map_depth = gl.glGenRenderbuffers(1)
         gl.glBindRenderbuffer(gl.GL_RENDERBUFFER, self.env_map_depth)
         gl.glRenderbufferStorage(gl.GL_RENDERBUFFER, gl.GL_DEPTH_COMPONENT, self.env_map_size, self.env_map_size)
@@ -281,9 +275,9 @@ class Renderer:
         return shaders.compileProgram(vs, fs)
 
     def _init_marker(self):
-        # Small cube for markers (studs/tubes)
+
         size = 2.0
-        # 8 corners
+
         v = [
             -size, -size, -size,
              size, -size, -size,
@@ -305,16 +299,16 @@ class Renderer:
         ]
         
         verts = []
-        norms = [] # Fake normals
+        norms = [] 
         
         for i in indices:
             idx = i * 3
             verts.extend([v[idx], v[idx+1], v[idx+2]])
-            norms.extend([0, 1, 0]) # Dummy
+            norms.extend([0, 1, 0]) 
             
         verts = np.array(verts, dtype='f4')
         norms = np.array(norms, dtype='f4')
-        colors = np.array([1, 1, 0, 1] * len(indices), dtype='f4') # Yellow default
+        colors = np.array([1, 1, 0, 1] * len(indices), dtype='f4') 
         
         self.marker_vao = gl.glGenVertexArrays(1)
         gl.glBindVertexArray(self.marker_vao)
@@ -369,7 +363,6 @@ class Renderer:
         gl.glUniformMatrix4fv(gl.glGetUniformLocation(self.grid_prog, 'm_view'), 1, gl.GL_FALSE, glm.value_ptr(view))
         gl.glUniformMatrix4fv(gl.glGetUniformLocation(self.grid_prog, 'm_proj'), 1, gl.GL_FALSE, glm.value_ptr(proj))
         
-        # 1. Draw Line from Light to Origin (Direction)
         line_verts = np.array([
             0.0, 0.0, 0.0,
             self.light_pos.x, self.light_pos.y, self.light_pos.z
@@ -379,23 +372,23 @@ class Renderer:
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self.light_line_vbo)
         gl.glBufferSubData(gl.GL_ARRAY_BUFFER, 0, line_verts.nbytes, line_verts)
         
-        # Identity model matrix for line (vertices are world space)
+
         ident = glm.mat4(1.0)
         gl.glUniformMatrix4fv(gl.glGetUniformLocation(self.grid_prog, 'm_model'), 1, gl.GL_FALSE, glm.value_ptr(ident))
         
         gl.glDrawArrays(gl.GL_LINES, 0, 2)
         
-        # 2. Draw Light Cube (Always on top)
-        gl.glDisable(gl.GL_DEPTH_TEST) # Disable depth test to make it visible through walls
+
+        gl.glDisable(gl.GL_DEPTH_TEST) 
         
-        # Translate to light position
+
         model = glm.translate(glm.mat4(1.0), self.light_pos)
         gl.glUniformMatrix4fv(gl.glGetUniformLocation(self.grid_prog, 'm_model'), 1, gl.GL_FALSE, glm.value_ptr(model))
         
         gl.glBindVertexArray(self.light_vao)
         gl.glDrawArrays(gl.GL_TRIANGLES, 0, self.light_cube_count)
         
-        gl.glEnable(gl.GL_DEPTH_TEST) # Re-enable depth test
+        gl.glEnable(gl.GL_DEPTH_TEST)
         
         gl.glBindVertexArray(0)
         gl.glUseProgram(0)
@@ -406,18 +399,16 @@ class Renderer:
         
         vertices = []
         colors = []
-        
-        # Grid lines (Grey)
+
         for i in range(int(-size), int(size)+1, int(step)):
-            # X lines
+
             vertices.extend([-size, 0, i, size, 0, i])
             colors.extend([0.5, 0.5, 0.5, 1.0] * 2)
-            # Z lines
+
             vertices.extend([i, 0, -size, i, 0, size])
             colors.extend([0.5, 0.5, 0.5, 1.0] * 2)
             
-        # Axes (RGB)
-        # Lift axes slightly to avoid z-fighting with grid
+
         y_off = 0.5
         vertices.extend([0, y_off, 0, 1000, y_off, 0])
         colors.extend([1, 0, 0, 1] * 2)
@@ -428,8 +419,7 @@ class Renderer:
         
         vertices = np.array(vertices, dtype='f4')
         colors = np.array(colors, dtype='f4')
-        
-        # Grid Shader
+
         vs_src = """
         #version 330
         in vec3 in_position;
@@ -477,11 +467,10 @@ class Renderer:
         self.grid_count = len(vertices) // 3
 
     def _init_light_viz(self):
-        # 1. Light Line (Direction)
+
         self.light_line_vao = gl.glGenVertexArrays(1)
         gl.glBindVertexArray(self.light_line_vao)
-        
-        # Position VBO (Dynamic)
+
         self.light_line_vbo = gl.glGenBuffers(1)
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self.light_line_vbo)
         gl.glBufferData(gl.GL_ARRAY_BUFFER, 2 * 3 * 4, None, gl.GL_DYNAMIC_DRAW)
@@ -489,8 +478,7 @@ class Renderer:
         pos_loc = gl.glGetAttribLocation(self.grid_prog, 'in_position')
         gl.glEnableVertexAttribArray(pos_loc)
         gl.glVertexAttribPointer(pos_loc, 3, gl.GL_FLOAT, False, 0, None)
-        
-        # Color VBO (Static Yellow)
+
         self.light_line_col_vbo = gl.glGenBuffers(1)
         gl.glBindBuffer(gl.GL_ARRAY_BUFFER, self.light_line_col_vbo)
         colors = np.array([1, 1, 0, 1] * 2, dtype='f4') # Yellow
@@ -501,8 +489,7 @@ class Renderer:
         gl.glVertexAttribPointer(col_loc, 4, gl.GL_FLOAT, False, 0, None)
         
         gl.glBindVertexArray(0)
-        
-        # 2. Light Cube (Source)
+
         size = 10.0
         v = [
             -size, -size, -size, size, -size, -size, size,  size, -size, -size,  size, -size,
@@ -550,10 +537,7 @@ class Renderer:
         gl.glUniformMatrix4fv(gl.glGetUniformLocation(self.shadow_prog, 'lightSpaceMatrix'), 1, gl.GL_FALSE, glm.value_ptr(light_space_matrix))
         
         model_loc = gl.glGetUniformLocation(self.shadow_prog, 'm_model')
-        
-        # We don't need colors or normals for shadow map, just positions
-        # Reuse upload_part but maybe we can optimize? 
-        # For now, just reuse vaos.
+
         
         all_objects = scene.get_all_objects()
         for obj in all_objects:
@@ -571,17 +555,15 @@ class Renderer:
         gl.glUseProgram(0)
 
     def render(self, scene, view, proj):
-        # 0. Calculate Light Space Matrix
+
         light_projection = glm.ortho(-1000.0, 1000.0, -1000.0, 1000.0, 1.0, 2000.0) 
         light_view = glm.lookAt(self.light_pos, glm.vec3(0.0, 0.0, 0.0), glm.vec3(0.0, 1.0, 0.0))
         light_space_matrix = light_projection * light_view
-        
-        # 1. Render Shadow Map
+
         viewport = gl.glGetIntegerv(gl.GL_VIEWPORT)
         self.render_shadow_map(scene, light_space_matrix)
         
-        # 2. Render Environment Map (Reflections)
-        # We need to bind shadow map here too if we want shadows in reflections
+
         gl.glViewport(0, 0, self.env_map_size, self.env_map_size)
         gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, self.env_map_fbo)
         
@@ -619,12 +601,11 @@ class Renderer:
             
             gl.glUniformMatrix4fv(view_loc, 1, gl.GL_FALSE, glm.value_ptr(views[i]))
             
-            # Update view_pos for specular/rim in reflection
-            # Camera pos is center (0,0,0) for the probe
+
             gl.glUniform3f(gl.glGetUniformLocation(self.prog, 'view_pos'), 0, 0, 0)
             
             for obj in all_objects:
-                # Basic material properties for reflection pass
+
                 gl.glUniform1f(gl.glGetUniformLocation(self.prog, 'shininess'), self.default_shininess)
                 gl.glUniform1f(gl.glGetUniformLocation(self.prog, 'specular_strength'), self.default_specular)
                 gl.glUniform1f(gl.glGetUniformLocation(self.prog, 'reflectivity'), 0.0)
@@ -640,14 +621,13 @@ class Renderer:
                     
         gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, 0)
 
-        # 3. Render Scene
+
         gl.glViewport(viewport[0], viewport[1], viewport[2], viewport[3])
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
         
         gl.glEnable(gl.GL_DEPTH_TEST)
         gl.glDisable(gl.GL_CULL_FACE)
-        
-        # Render Grid
+
         gl.glUseProgram(self.grid_prog)
         gl.glUniformMatrix4fv(gl.glGetUniformLocation(self.grid_prog, 'm_view'), 1, gl.GL_FALSE, glm.value_ptr(view))
         gl.glUniformMatrix4fv(gl.glGetUniformLocation(self.grid_prog, 'm_proj'), 1, gl.GL_FALSE, glm.value_ptr(proj))
@@ -656,34 +636,28 @@ class Renderer:
         gl.glBindVertexArray(self.grid_vao)
         gl.glDrawArrays(gl.GL_LINES, 0, self.grid_count)
         gl.glBindVertexArray(0)
-        
-        # Render Parts
+
         gl.glUseProgram(self.prog)
         gl.glUniformMatrix4fv(gl.glGetUniformLocation(self.prog, 'm_view'), 1, gl.GL_FALSE, glm.value_ptr(view))
         gl.glUniformMatrix4fv(gl.glGetUniformLocation(self.prog, 'm_proj'), 1, gl.GL_FALSE, glm.value_ptr(proj))
         gl.glUniformMatrix4fv(gl.glGetUniformLocation(self.prog, 'lightSpaceMatrix'), 1, gl.GL_FALSE, glm.value_ptr(light_space_matrix))
-        
-        # Lighting Uniforms
+
         gl.glUniform3f(gl.glGetUniformLocation(self.prog, 'light_pos'), self.light_pos.x, self.light_pos.y, self.light_pos.z)
-        
-        # Bind Shadow Map
+
         gl.glActiveTexture(gl.GL_TEXTURE0)
         gl.glBindTexture(gl.GL_TEXTURE_2D, self.depth_map)
         gl.glUniform1i(gl.glGetUniformLocation(self.prog, 'shadowMap'), 0)
-        
-        # Bind Env Map
+
         gl.glActiveTexture(gl.GL_TEXTURE1)
         gl.glBindTexture(gl.GL_TEXTURE_CUBE_MAP, self.env_map)
         gl.glUniform1i(gl.glGetUniformLocation(self.prog, 'skybox'), 1)
-        
-        # Calculate Camera Position
+
         inv_view = glm.inverse(view)
         cam_pos = glm.vec3(inv_view[3])
         gl.glUniform3f(gl.glGetUniformLocation(self.prog, 'view_pos'), cam_pos.x, cam_pos.y, cam_pos.z)
         
         model_loc = gl.glGetUniformLocation(self.prog, 'm_model')
-        
-        # Material locations
+
         shininess_loc = gl.glGetUniformLocation(self.prog, 'shininess')
         spec_loc = gl.glGetUniformLocation(self.prog, 'specular_strength')
         refl_loc = gl.glGetUniformLocation(self.prog, 'reflectivity')
@@ -694,8 +668,7 @@ class Renderer:
         for obj in all_objects:
             part = obj.part
             model_matrix = obj.world_matrix
-            
-            # Material properties
+
             mat_shininess = self.default_shininess
             mat_specular = self.default_specular
             mat_reflectivity = self.default_reflectivity
@@ -728,16 +701,12 @@ class Renderer:
         gl.glUseProgram(0)
 
     def render_outline(self, part, view, proj, color=(1, 0.5, 0, 1)):
-        # Render part in wireframe/outline
+
         gl.glUseProgram(self.prog)
         gl.glUniformMatrix4fv(gl.glGetUniformLocation(self.prog, 'm_view'), 1, gl.GL_FALSE, glm.value_ptr(view))
         gl.glUniformMatrix4fv(gl.glGetUniformLocation(self.prog, 'm_proj'), 1, gl.GL_FALSE, glm.value_ptr(proj))
         gl.glUniform3f(gl.glGetUniformLocation(self.prog, 'light_pos'), 500.0, -500.0, 500.0)
-        
-        # Override color in shader? 
-        # The current shader uses vertex color. We need a uniform override or a new shader.
-        # For simplicity, let's use a "solid color" mode in the shader or just ignore vertex color.
-        # Actually, let's just create a simple solid color shader for outline to be safe/clean.
+
         pass
 
     def _init_outline_shader(self):
@@ -783,10 +752,9 @@ class Renderer:
         gl.glUniform4f(gl.glGetUniformLocation(self.outline_prog, 'u_color'), 1.0, 0.5, 0.0, 1.0) # Orange
         
         model_loc = gl.glGetUniformLocation(self.outline_prog, 'm_model')
-        
-        # Enable Polygon Offset to draw wireframe on top of solid
+
         gl.glEnable(gl.GL_POLYGON_OFFSET_LINE)
-        gl.glPolygonOffset(-1.0, -1.0) # Move closer to camera
+        gl.glPolygonOffset(-1.0, -1.0) 
         gl.glPolygonMode(gl.GL_FRONT_AND_BACK, gl.GL_LINE)
         
         vao, count = self.upload_part(obj.part)

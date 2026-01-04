@@ -4,7 +4,7 @@ class SceneObject:
     def __init__(self, part, name="Part"):
         self.part = part
         self.name = name
-        self.matrix = glm.mat4(1.0) # Local transform
+        self.matrix = glm.mat4(1.0) 
         self.parent = None
         self.children = []
         self.selected = False
@@ -21,13 +21,11 @@ class SceneObject:
         
         if new_parent:
             new_parent.children.append(self)
-            # Recalculate local matrix to preserve world position
-            # parent_world * local = current_world
-            # local = inv(parent_world) * current_world
+
             inv_parent = glm.inverse(new_parent.world_matrix)
             self.matrix = inv_parent * current_world
         else:
-            # If no parent, local is world
+           
             self.matrix = current_world
 
     @property
@@ -45,8 +43,7 @@ class SceneObject:
 
     def get_world_aabb(self, override_matrix=None):
         mat = override_matrix if override_matrix is not None else self.world_matrix
-        
-        # Local AABB corners
+
         min_p = self.part.aabb_min
         max_p = self.part.aabb_max
         
@@ -73,8 +70,8 @@ class SceneObject:
 
 class Scene:
     def __init__(self):
-        self.objects = [] # List of root objects
-        self.selection = [] # Selected objects
+        self.objects = [] 
+        self.selection = [] 
         
     def add_object(self, obj):
         self.objects.append(obj)
@@ -82,11 +79,10 @@ class Scene:
     def remove_object(self, obj):
         if obj in self.objects:
             self.objects.remove(obj)
-        # Also handle children if needed? 
-        # Usually we only add roots to self.objects
+
         
     def get_all_objects(self):
-        # Flatten hierarchy
+
         all_objs = []
         def recurse(obj):
             all_objs.append(obj)

@@ -25,7 +25,7 @@ class App:
         if not glfw.init():
             sys.exit(1)
 
-        # Core Profile 3.3
+
         glfw.window_hint(glfw.CONTEXT_VERSION_MAJOR, 3)
         glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 3)
         glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
@@ -38,27 +38,22 @@ class App:
 
         glfw.make_context_current(self.window)
 
-        # Enable Depth Test
         gl.glEnable(gl.GL_DEPTH_TEST)
-        # Disable Cull Face for LDraw compatibility
+
         gl.glDisable(gl.GL_CULL_FACE)
 
-        # ImGui Setup
         imgui.create_context()
         self.impl = GlfwRenderer(self.window)
 
-        # Callbacks
         glfw.set_mouse_button_callback(self.window, self.mouse_button_callback)
         glfw.set_scroll_callback(self.window, self.scroll_callback)
         glfw.set_window_size_callback(self.window, self.resize_callback)
 
-        # Systems
         self.renderer = Renderer()
         self.camera = Camera(1280, 720)
         self.loader = LDrawLoader([PARTS_DIR, P_DIR, MPD_DIR])
         self.scene = Scene()
 
-        # State
         self.running = True
         self.selected_part = None
         self.drag_start_pos = None
@@ -73,16 +68,13 @@ class App:
         self.files_cache = []
         self._refresh_files()
 
-        # MPD相关状态
         self.show_mpd_subfiles = False
         self.current_mpd_part = None
         self.mpd_subfiles = []
 
-        # Mouse state
         self.last_mouse_x = 0
         self.last_mouse_y = 0
 
-        # Message for UI
         self.status_message = ""
         self.status_timer = 0.0
 
@@ -103,7 +95,6 @@ class App:
             glfw.poll_events()
             self.impl.process_inputs()
 
-            # Mouse polling for movement
             x, y = glfw.get_cursor_pos(self.window)
             dx = x - self.last_mouse_x
             dy = y - self.last_mouse_y
@@ -227,13 +218,13 @@ class App:
         return (tmin < tmax and tmax > 0), tmin
 
     def update(self):
-        # Update Status Timer
+
         if self.status_timer > 0:
             self.status_timer -= 1.0 / 60.0
             if self.status_timer <= 0:
                 self.status_message = ""
 
-        # Physics (Simple Gravity)
+
         dt = 1.0 / 60.0
         gravity = 200.0
 
@@ -276,29 +267,22 @@ class App:
         view = self.camera.get_view_matrix()
         proj = self.camera.get_proj_matrix()
 
-        # Render Scene
+
         self.renderer.render(self.scene, view, proj)
 
-        # Render Selected Part Outline
         if self.selected_part:
              self.renderer.render_selected_outline(self.selected_part, view, proj)
-        
-        # Render Light Gizmo
+
         self.renderer.render_light_source(view, proj)
 
-        # Render UI
         imgui.new_frame()
-        
-        # Draw Light Label
+
         viewport = gl.glGetIntegerv(gl.GL_VIEWPORT) # [x, y, w, h]
-        # Project light pos to screen
+
         screen_pos = glm.project(self.renderer.light_pos, view, proj, glm.vec4(viewport))
-        # screen_pos.y is from bottom, imgui uses from top
+
         window_h = glfw.get_window_size(self.window)[1]
-        
-        # Check if light is in front of camera
-        # Simple check: distance to plane? Or just check z in clip space?
-        # glm.project returns window coordinates. Z is depth (0-1).
+
         if 0.0 <= screen_pos.z <= 1.0:
             imgui.set_next_window_position(screen_pos.x, window_h - screen_pos.y)
             imgui.begin("LightLabel", flags=imgui.WINDOW_NO_TITLE_BAR | imgui.WINDOW_NO_RESIZE | imgui.WINDOW_ALWAYS_AUTO_RESIZE | imgui.WINDOW_NO_BACKGROUND | imgui.WINDOW_NO_INPUTS)
@@ -307,7 +291,6 @@ class App:
 
         self.draw_ui()
 
-        # Overlay Status Message
         if self.status_message:
             w, h = glfw.get_window_size(self.window)
             imgui.set_next_window_position(w / 2, 50, pivot_x=0.5)
@@ -329,7 +312,6 @@ class App:
                 imgui.end_menu()
             imgui.end_main_menu_bar()
 
-        # File Browser
         if self.show_file_browser:
             expanded, opened = imgui.begin("Part Browser", True)
             if not opened:
@@ -339,7 +321,6 @@ class App:
 
             imgui.separator()
 
-            # List files
             for fname in self.files_cache:
                 if self.part_search_text.lower() in fname.lower():
                     if imgui.button(fname):
@@ -351,7 +332,6 @@ class App:
                         imgui.set_tooltip(f"Load {fname}")
             imgui.end()
 
-        # MPD Subfiles
         if self.show_mpd_subfiles and self.current_mpd_part:
             expanded, opened = imgui.begin("MPD Subfiles", True)
             if not opened:
@@ -372,7 +352,6 @@ class App:
                         self.status_timer = 2.0
             imgui.end()
 
-        # Properties Panel
         imgui.begin("Properties")
         imgui.text("Application Average: %.3f ms/frame (%.1f FPS)" % (1000.0/imgui.get_io().framerate, imgui.get_io().framerate))
         
@@ -415,8 +394,7 @@ class App:
 
                 imgui.separator()
                 imgui.text("Material")
-                
-                # Ensure material dict exists
+
                 if not hasattr(self.selected_part, 'material') or self.selected_part.material is None:
                     self.selected_part.material = {
                         'shininess': self.renderer.default_shininess,
@@ -427,16 +405,13 @@ class App:
                     }
                 
                 mat = self.selected_part.material
-                
-                # Use Roughness slider instead of Shininess for better UX
-                # Roughness 0 -> Shininess 256, Roughness 1 -> Shininess 2
+
                 current_roughness = 1.0 - math.sqrt((mat['shininess'] - 2.0) / 254.0)
                 current_roughness = max(0.0, min(1.0, current_roughness))
                 
                 changed_ro, ro = imgui.slider_float("Roughness", current_roughness, 0.0, 1.0)
                 if changed_ro:
-                    # Convert Roughness back to Shininess
-                    # S = 254 * (1 - R)^2 + 2
+
                     mat['shininess'] = 254.0 * ((1.0 - ro) ** 2) + 2.0
                 
                 changed_sp, sp = imgui.slider_float("Specular Strength", mat['specular'], 0.0, 5.0)

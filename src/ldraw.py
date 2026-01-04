@@ -2,7 +2,7 @@ import os
 import glm
 import numpy as np
 
-# Basic LDraw Color Table (Simplified)
+# Basic LDraw Color Table 
 COLORS = {
     0: (0.1, 0.1, 0.1, 1.0),  # Black
     1: (0.0, 0.0, 1.0, 1.0),  # Blue
@@ -25,9 +25,9 @@ def get_color(code, current_color_code=None):
     if code == 16:
         if current_color_code is not None:
             return get_color(current_color_code)
-        return COLORS.get(7, (0.8, 0.8, 0.8, 1.0))  # Default
+        return COLORS.get(7, (0.8, 0.8, 0.8, 1.0))  
     if code == 24:
-        return (0.2, 0.2, 0.2, 1.0)  # Edge color, simplified
+        return (0.2, 0.2, 0.2, 1.0)  
     return COLORS.get(code, (0.8, 0.8, 0.8, 1.0))
 
 
@@ -82,15 +82,13 @@ class LDrawPart:
         self.loader = loader
         self.commands = []
 
-        # Geometry data (local space)
         self.vertices = []
         self.normals = []
         self.colors = []
 
-        # Logical components
-        self.studs = []  # List of (transform_matrix, filename)
-        self.tubes = []  # List of (transform_matrix, filename)
 
+        self.studs = []  
+        self.tubes = []  
         self.aabb_min = glm.vec3(float('inf'))
         self.aabb_max = glm.vec3(float('-inf'))
 
@@ -100,22 +98,17 @@ class LDrawPart:
         self.mpd_subfiles = {}  # MPD主文件包含的子文件 {sub_filename: lines_list}
 
     def resolve_path(self, filename):
-        # Normalize slashes
+
         filename = filename.replace('\\', '/')
 
-        # Candidate names
         candidates = [filename, filename.lower()]
 
-        # 1. Check strict search paths
         for p in self.loader.search_paths:
             for cand in candidates:
                 full = os.path.join(p, cand)
                 if os.path.exists(full):
                     return full
 
-        # 2. Heuristic: Check common LDraw subdirectories if not present in filename
-        # e.g. if looking for "stud.dat" and it's not in roots, check "p/stud.dat" or "parts/stud.dat"
-        # Only if filename doesn't already have path components
         if '/' not in filename:
             subdirs = ['p', 'parts', 'P', 'PARTS']
             for p in self.loader.search_paths:
@@ -233,8 +226,7 @@ class LDrawPart:
             if sub_part:
                 self._bake_subpart(sub_part, transform, color)
 
-        elif cmd == '3':  # Triangle
-            # 3 <colour> x1 y1 z1 x2 y2 z2 x3 y3 z3
+        elif cmd == '3': 
             if len(parts) < 11: return
             color = int(parts[1])
             v1 = glm.vec3(float(parts[2]), float(parts[3]), float(parts[4]))
@@ -242,8 +234,8 @@ class LDrawPart:
             v3 = glm.vec3(float(parts[8]), float(parts[9]), float(parts[10]))
             self._add_triangle(v1, v2, v3, color)
 
-        elif cmd == '4':  # Quad
-            # 4 <colour> x1 y1 z1 x2 y2 z2 x3 y3 z3 x4 y4 z4
+        elif cmd == '4':  
+
             if len(parts) < 14: return
             color = int(parts[1])
             v1 = glm.vec3(float(parts[2]), float(parts[3]), float(parts[4]))
@@ -251,7 +243,7 @@ class LDrawPart:
             v3 = glm.vec3(float(parts[8]), float(parts[9]), float(parts[10]))
             v4 = glm.vec3(float(parts[11]), float(parts[12]), float(parts[13]))
             self._add_triangle(v1, v2, v3, color)
-            self._add_triangle(v1, v3, v4, color)  # Quad split into 2 tris
+            self._add_triangle(v1, v3, v4, color)  
 
     def _add_triangle(self, v1, v2, v3, color_code):
         # Update AABB
@@ -263,14 +255,12 @@ class LDrawPart:
         self.aabb_max = glm.max(self.aabb_max, v2)
         self.aabb_max = glm.max(self.aabb_max, v3)
 
-        # Calculate normal
         edge1 = v2 - v1
         edge2 = v3 - v1
         normal = glm.cross(edge1, edge2)
         if glm.length(normal) > 0:
             normal = glm.normalize(normal)
 
-        # Add to lists
         self.vertices.extend([v1.x, v1.y, v1.z])
         self.normals.extend([normal.x, normal.y, normal.z])
         self.colors.append(color_code)
@@ -284,43 +274,27 @@ class LDrawPart:
         self.colors.append(color_code)
 
     def _bake_subpart(self, sub_part, transform, color_code):
-        # Transform sub-part geometry and add to self
-        # Apply transform to vertices and normals
-
-        # Optimization: Use numpy for bulk transform if possible, but here we iterate
-        # Since we parse once, it's okay.
-
-        # Transform matrix3 for normals (inverse transpose, but if orthogonal, just rotation)
-        # LDraw transforms can include scaling (-1 for inversion).
-        # So we should use inverse transpose of the upper-left 3x3.
         mat3 = glm.mat3(transform)
         norm_mat = glm.transpose(glm.inverse(mat3))
-
-        # Extract data from sub_part
-        # sub_part.vertices is flat list [x,y,z, x,y,z...]
-        # sub_part.normals is flat list
-
-        # We need to process vertices in groups of 3
         count = len(sub_part.vertices) // 3
 
         for i in range(count):
             idx = i * 3
             v = glm.vec3(sub_part.vertices[idx], sub_part.vertices[idx + 1], sub_part.vertices[idx + 2])
             n = glm.vec3(sub_part.normals[idx], sub_part.normals[idx + 1], sub_part.normals[idx + 2])
-            c = sub_part.colors[i]  # One color per vertex? No, code structure above adds color per vertex.
+            c = sub_part.colors[i]  
 
-            # Apply color inheritance
+
             final_color = c
             if c == 16:
                 final_color = color_code
 
-            # Transform
+
             v_world = transform * glm.vec4(v, 1.0)
             n_world = norm_mat * n
             if glm.length(n_world) > 0:
                 n_world = glm.normalize(n_world)
 
-            # Update AABB
             v_vec3 = glm.vec3(v_world)
             self.aabb_min = glm.min(self.aabb_min, v_vec3)
             self.aabb_max = glm.max(self.aabb_max, v_vec3)
@@ -329,7 +303,6 @@ class LDrawPart:
             self.normals.extend([n_world.x, n_world.y, n_world.z])
             self.colors.append(final_color)
 
-        # Bake Studs and Tubes with transform
         for stud_trans, stud_file in sub_part.studs:
             new_trans = transform * stud_trans
             self.studs.append((new_trans, stud_file))

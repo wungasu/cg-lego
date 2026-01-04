@@ -8,7 +8,7 @@ def export_stl(scene, filename):
         all_objects = scene.get_all_objects()
         for obj in all_objects:
             world_mat = obj.world_matrix
-            # Inverse transpose for normals
+
             norm_mat = glm.transpose(glm.inverse(glm.mat3(world_mat)))
             
             part = obj.part
@@ -20,13 +20,11 @@ def export_stl(scene, filename):
                 v1 = glm.vec3(part.vertices[idx], part.vertices[idx+1], part.vertices[idx+2])
                 v2 = glm.vec3(part.vertices[idx+3], part.vertices[idx+4], part.vertices[idx+5])
                 v3 = glm.vec3(part.vertices[idx+6], part.vertices[idx+7], part.vertices[idx+8])
-                
-                # Transform
+
                 v1 = glm.vec3(world_mat * glm.vec4(v1, 1.0))
                 v2 = glm.vec3(world_mat * glm.vec4(v2, 1.0))
                 v3 = glm.vec3(world_mat * glm.vec4(v3, 1.0))
-                
-                # Normal
+
                 n = glm.normalize(glm.cross(v2 - v1, v3 - v1))
                 
                 f.write(f"facet normal {n.x} {n.y} {n.z}\n")
